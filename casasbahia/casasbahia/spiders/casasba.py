@@ -1,38 +1,43 @@
 import scrapy
-
-from ..readlist import read_list
-
-
-base_url = 'https://www.casasbahia.com.br/{}/b'
+import json
 
 
 class CasasbaSpider(scrapy.Spider):
     name = 'casasba'
+    page = 1
+    name_categories = []
 
-    found_items  = '//*[@class="SearchResults__Controls-sc-1j8xo2z-0 jrPaix"]/p/b/text()'
-    texto = '/html/body/div[1]/div[2]/div/div/div[5]/div[2]/div/section/ul/li[5]/div/div[2]/a/div/div'
-    rating = './/meta[@itemprop="ratingValue"]/@content'
-    review = './/meta[@itemprop="reviewCount"]/@content'
-    title  = './/h2[@class="ProductCard__Title-sc-2vuvzo-0 iBDOQj"]//text()'
-    image  = './/img/@src'
-   
-    def start_requests(self):
-        for self.item in read_list():
-            yield scrapy.Request(base_url.format(self.item))
+    base_url = 'https://prd-api-partner.viavarejo.com.br/api/search?resultsPerPage=20&terms=iphone&page={}&salesChannel=desktop&apiKey=casasbahia'
+    start_urls = [base_url.format(1)]
 
     def parse(self, response):
-        for i in response.xpath('//li[@class="ProductCard__Wrapper-sc-2vuvzo-9 bERDot"]'):
-            rating = i.xpath(self.rating).extract()
-            review = i.xpath(self.review).extract()
-            title  = i.xpath(self.title).getall()
-            image  = i.xpath(self.image).getall()
-    
+
+        response_json = json.loads(response.body)
+       
+        for item in response_json.get('products', []):
+            image = item.get('images')
+            categories = item.get('categories')
+            details = item.get('details')
+            payment = item.get('installment')         
+        
+            for i in range(0, len(categories)):
+                self.name_categories.append(categories[i]['name'])
+
             yield {
-                'term':self.item,
-                'found items':response.xpath(self.found_items).extract(),
-                'title':title,
-                'review':review,
-                'rating':rating,
-                'url':response.url,
-                'image':image
+                'ID':item.get('id'),
+                'status':item.get('status'),
+                'name':item.get('name'),
+                'image':image['default'],
+                'price':item.get('price'),
+                'categories':self.name_categories,
+                'marca':details['marca'],
+                'installment_qty':payment['count'],
+                'installment_price':payment['price'],
+                'url':item.get('url')
             }
+            self.name_categories = []
+
+        if response_json['pagination']['next']:
+            self.page += 1
+            yield scrapy.Request(self.base_url.format(self.page))
+        

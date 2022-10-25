@@ -10,5 +10,4 @@ from itemadapter import ItemAdapter
 
 class CasasbahiaPipeline:
     def process_item(self, item, spider):
-        print(f'Pipeline: {item["title"][0]}')
         return item
